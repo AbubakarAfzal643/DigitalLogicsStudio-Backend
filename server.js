@@ -8,7 +8,6 @@ const PORT = process.env.PORT || 5000;
 const validateEnvironment = () => {
   const required = ["MONGO_URI", "JWT_SECRET"];
   const missing = required.filter((v) => !process.env[v]);
-
   if (missing.length > 0) {
     throw new Error(
       `Missing required environment variables: ${missing.join(", ")}`,
@@ -17,7 +16,7 @@ const validateEnvironment = () => {
 };
 
 if (process.env.NODE_ENV !== "production") {
-  // ── Local development: normal HTTP server ────────────────────────────────
+  // ── Local development ────────────────────────────────────────────────────
   (async () => {
     try {
       validateEnvironment();
@@ -31,23 +30,27 @@ if (process.env.NODE_ENV !== "production") {
 
   module.exports = app;
 } else {
-  // ── Vercel serverless: lazy DB connection ────────────────────────────────
-  // BUG FIX: The previous code called connectDB() without awaiting it before
-  // exporting.  On a cold start the first request could arrive before Mongoose
-  // connected, returning MongoNotConnectedError on EVERY route.
-  //
-  // Solution: export a thin async wrapper.  Mongoose caches the connection on
-  // the module level so connectDB() is a no-op on warm invocations.
-
+  // ── Vercel serverless ────────────────────────────────────────────────────
+  // CORS FIX: OPTIONS preflight requests must be answered immediately —
+  // before connectDB() is called. Previously every preflight triggered a DB
+  // connection attempt which errored/timed-out before CORS headers were sent,
+  // so the browser saw no Access-Control-Allow-Origin and blocked the request.
   validateEnvironment();
 
   let ready = false;
 
   module.exports = async (req, res) => {
+    // Answer preflight immediately — no DB needed
+    if (req.method === "OPTIONS") {
+      return app(req, res);
+    }
+
+    // Lazy-connect on first real request
     if (!ready) {
       await connectDB();
       ready = true;
     }
+
     app(req, res);
   };
 }
