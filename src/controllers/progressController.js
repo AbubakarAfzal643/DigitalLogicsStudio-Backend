@@ -211,7 +211,7 @@ async function openTopic(req, res, next) {
 async function toggleSubtopic(req, res, next) {
   try {
     const { topicId, subtopicId } = req.params;
-    const { title = "", totalSubtopics } = req.body || {};
+    const { title = "", totalSubtopics, equivalentSubtopicIds = [] } = req.body || {};
     const dateKey = toDateKey();
     const entry = req.user.getTopicProgress(topicId);
 
@@ -220,8 +220,13 @@ async function toggleSubtopic(req, res, next) {
     entry.openedAt = entry.openedAt || new Date();
 
     const completed = new Set(entry.completedSubtopics);
-    if (completed.has(subtopicId)) {
-      completed.delete(subtopicId);
+    const equivalentIds = Array.from(
+      new Set([subtopicId, ...equivalentSubtopicIds].filter(Boolean)),
+    );
+    const isCompleted = equivalentIds.some((id) => completed.has(id));
+
+    if (isCompleted) {
+      equivalentIds.forEach((id) => completed.delete(id));
     } else {
       completed.add(subtopicId);
     }
