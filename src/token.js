@@ -45,8 +45,10 @@ function setAuthCookie(res, token) {
 }
 
 function clearAuthCookie(res) {
+  const clearOptions = { ...getCookieOptions() };
+  delete clearOptions.maxAge;
   // Must use the same options to properly clear the cookie
-  res.clearCookie("token", getCookieOptions());
+  res.clearCookie("token", clearOptions);
 }
 
 module.exports = {
